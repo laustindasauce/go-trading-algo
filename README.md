@@ -14,3 +14,8 @@
     * $ go get github.com/alpacahq/alpaca-trade-api-go/alpaca
 * Download Decimal Package
     * $ go get github.com/shopspring/decimal
+
+# Redis-shortable
+* Currently works but takes over 5 minutes to execute
+
+* **Fixed the execution time to only take 2.45 seconds without go-routines**
