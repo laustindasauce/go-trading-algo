@@ -46,7 +46,6 @@ func init() {
 }
 
 func main() {
-	acct, err := alpacaClient.client.GetAccount()
 	if err != nil {
 		panic(err)
 	}
@@ -79,7 +78,7 @@ func main() {
 	}
 
 	fmt.Println("\nFinished running Falcon One")
-	acct, err = alpacaClient.client.GetAccount()
+	acct, err := alpacaClient.client.GetAccount()
 	if err != nil {
 		panic(err)
 	}
