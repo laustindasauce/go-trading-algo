@@ -8,6 +8,7 @@ import (
 
 	"github.com/alpacahq/alpaca-trade-api-go/alpaca"
 	"github.com/alpacahq/alpaca-trade-api-go/common"
+	"github.com/gomodule/redigo/redis"
 	"github.com/my/repo/go/src/github.com/joho/godotenv"
 )
 
@@ -25,6 +26,7 @@ type alpacaClientContainer struct {
 	nasdaq       []alpaca.Asset
 	shortable    []string
 	nonShortable []string
+	nonTradeable []string
 }
 
 var alpacaClient alpacaClientContainer
@@ -39,6 +41,7 @@ func init() {
 	alpacaClient = alpacaClientContainer{
 		alpaca.NewClient(common.Credentials()),
 		[]alpaca.Asset{},
+		[]string{},
 		[]string{},
 		[]string{},
 	}
@@ -58,6 +61,14 @@ func main() {
 	defer track(runningtime("main"))
 	alpacaClient.setAssets()
 	alpacaClient.getShortable()
+	fmt.Println("Shortable Assets:", len(alpacaClient.shortable))
+	fmt.Println("non-Shortable Assets:", len(alpacaClient.nonShortable))
+	fmt.Println("non-Tradeable Assets:", len(alpacaClient.nonTradeable))
+	if len(alpacaClient.shortable) > len(alpacaClient.nonShortable) {
+		setRedis(true)
+	} else {
+		setRedis(false)
+	}
 }
 
 func (alp *alpacaClientContainer) setAssets() {
@@ -78,13 +89,39 @@ func (alp *alpacaClientContainer) setAssets() {
 func (alp *alpacaClientContainer) getShortable() {
 	fmt.Println("Nasdaq size:", len(alp.nasdaq))
 	for i := 0; i < len(alp.nasdaq); i++ {
-		if alp.nasdaq[i].Tradable && alp.nasdaq[i].Shortable {
-			alp.shortable = append(alp.shortable, alp.nasdaq[i].Symbol)
+		if alp.nasdaq[i].Tradable {
+			if alp.nasdaq[i].Shortable {
+				alp.shortable = append(alp.shortable, alp.nasdaq[i].Symbol)
+			} else {
+				alp.nonShortable = append(alp.nonShortable, alp.nasdaq[i].Symbol)
+			}
 		} else {
-			alp.nonShortable = append(alp.nonShortable, alp.nasdaq[i].Symbol)
+			alp.nonTradeable = append(alp.nonTradeable, alp.nasdaq[i].Symbol)
 		}
 	}
+}
 
-	fmt.Println("Shortable Assets:", len(alp.shortable))
-	fmt.Println("non-Shortable Assets:", len(alp.nonShortable))
+func setRedis(shortable bool) {
+	secret := goDotEnvVariable("REDIS")
+
+	client, err := redis.Dial("tcp", "10.10.10.1:6379")
+	if err != nil {
+		log.Fatal(err)
+	}
+	_, err = client.Do("AUTH", secret)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if shortable {
+		client.Do("INCR", "goShort")
+	}
+	client.Do("INCR", "totalGoShort")
+	shortableDays, _ := redis.Int(client.Do("GET", "goShort"))
+	totalDays, _ := redis.Int(client.Do("GET", "totalGoShort"))
+	getPercent(shortableDays, totalDays)
+}
+
+func getPercent(shortableDays, totalDays int) {
+	pct := (shortableDays / totalDays) * 100
+	fmt.Print(pct, "% of the time the Nasdaq has been more than 50% shortable over the past ", totalDays, " days\n")
 }
