@@ -46,10 +46,6 @@ func init() {
 }
 
 func main() {
-	if err != nil {
-		panic(err)
-	}
-
 	i := 0
 	for i < 5 {
 		i++
