@@ -66,11 +66,10 @@ func main() {
 	fmt.Println("Nasdaq total assets:", len(alpacaClient.nasdaq))
 	fmt.Println("Nasdaq shortable:", len(alpacaClient.shortable))
 	fmt.Println("Nasdaq non-shortable:", len(alpacaClient.nonShortable))
-	fmt.Println("Nasdaq non-tradable:", len(alpacaClient.nonShortable))
+	fmt.Println("Nasdaq non-tradable:", len(alpacaClient.nonTradable))
 }
 
 func (alp *alpacaClientContainer) setAssets() {
-	defer wg.Done()
 	// Get a list of all active assets.
 	status := "active"
 	assets, err := alp.api.ListAssets(&status)
@@ -86,14 +85,24 @@ func (alp *alpacaClientContainer) setAssets() {
 	}
 
 	// Create sub slices so we can implement go-routines
-	size := len(alp.nasdaq) / 20
+	cont := true
+	subs := 100
+	for cont {
+		if len(alp.nasdaq)%subs == 0 || subs == 1 {
+			cont = false
+		} else {
+			subs--
+			continue
+		}
+	}
+	fmt.Println(subs)
+	size := len(alp.nasdaq) / subs
 	var j int
 	for i := 0; i < len(alp.nasdaq); i += size {
 		j += size
 		if j > len(alp.nasdaq) {
 			j = len(alp.nasdaq)
 		}
-		// do what do you want to with the sub-slice, here just printing the sub-slices
 		wg.Add(1)
 		go alp.getShortable(alp.nasdaq[i:j])
 	}
@@ -101,7 +110,6 @@ func (alp *alpacaClientContainer) setAssets() {
 
 func (alp *alpacaClientContainer) getShortable(subNasdaq []alpaca.Asset) {
 	defer wg.Done()
-	fmt.Println("subNasdaq size:", len(subNasdaq))
 	for i := 0; i < len(subNasdaq); i++ {
 		if subNasdaq[i].Tradable {
 			if subNasdaq[i].Shortable {
@@ -110,7 +118,6 @@ func (alp *alpacaClientContainer) getShortable(subNasdaq []alpaca.Asset) {
 				alp.nonShortable = append(alp.nonShortable, subNasdaq[i].Symbol)
 			}
 		} else {
-			alp.nonShortable = append(alp.nonShortable, subNasdaq[i].Symbol)
 			alp.nonTradable = append(alp.nonTradable, subNasdaq[i].Symbol)
 		}
 	}
